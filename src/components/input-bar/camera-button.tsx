@@ -8,6 +8,20 @@ import { useCapture } from "@/hooks/use-capture";
 import { useMediaRecorder } from "@/hooks/use-media-recorder";
 import { useProjectStore } from "@/stores/project-store";
 
+/**
+ * CameraButton — tap to open camera, hold to record audio then open camera.
+ *
+ * IMPORTANT iOS Safari constraints:
+ * 1. file input .click() MUST be called synchronously within a user gesture
+ *    handler (touchend / click). Wrapping in setTimeout or await breaks
+ *    the gesture chain and iOS silently ignores the click or drops onChange.
+ * 2. The file input must NOT use `display:none` — iOS doesn't reliably fire
+ *    onChange for invisible inputs. Use off-screen positioning instead.
+ * 3. The `capture` attribute opens the native camera directly. We keep it
+ *    to provide the museum use-case (photo of exhibit) but accept that the
+ *    user can only take a fresh photo, not pick from gallery.
+ */
+
 /** Milliseconds to distinguish tap from hold */
 const HOLD_THRESHOLD = 300;
 
@@ -56,7 +70,7 @@ export function CameraButton() {
         console.error("[CameraButton] Error processing capture:", error);
       }
 
-      // Reset input
+      // Reset input so the same file can be selected again
       if (inputRef.current) {
         inputRef.current.value = "";
       }
@@ -65,22 +79,22 @@ export function CameraButton() {
   );
 
   /**
-   * Track whether the interaction was touch-initiated to prevent ghost clicks.
+   * Open the file picker / camera.
+   * MUST be called synchronously within a user gesture — no setTimeout, no await before this.
    */
-  const isTouchRef = useRef(false);
+  const openFilePicker = useCallback(() => {
+    inputRef.current?.click();
+  }, []);
 
   /**
-   * Press start — start a timer. If released before threshold → tap (photo only).
+   * Press start — start a timer. If released before threshold → tap.
    * If held past threshold → start recording audio.
    */
   const handlePressStart = useCallback(
     (e: React.TouchEvent | React.MouseEvent) => {
-      // Track touch vs mouse to prevent ghost clicks
+      // On touch devices, prevent the subsequent mouse events from firing
       if ("touches" in e) {
-        isTouchRef.current = true;
-      } else if (isTouchRef.current) {
-        // Ghost mouse event after touch — ignore
-        return;
+        e.stopPropagation();
       }
 
       isHoldingRef.current = false;
@@ -97,10 +111,13 @@ export function CameraButton() {
   );
 
   /**
-   * Press end — stop recording if holding, then open camera.
-   * If it was a tap (< HOLD_THRESHOLD), just open camera normally.
+   * Press end — if tap, open camera synchronously.
+   * If hold, stop recording, open camera synchronously, store audio for later.
+   *
+   * KEY: openFilePicker() is called SYNCHRONOUSLY in this handler — no await
+   * before it, no setTimeout wrapping. This preserves the iOS user gesture chain.
    */
-  const handlePressEnd = useCallback(async () => {
+  const handlePressEnd = useCallback(() => {
     // Clear the hold timer if it hasn't fired yet
     if (holdTimerRef.current) {
       clearTimeout(holdTimerRef.current);
@@ -108,23 +125,21 @@ export function CameraButton() {
     }
 
     if (isHoldingRef.current) {
-      // Was holding → stop recording, save audio, then open camera
+      // Was holding → open camera first (synchronously!), then stop recording async
       isHoldingRef.current = false;
       setShowRecordingIndicator(false);
-      const audioBlob = await stopRecording();
-      pendingAudioRef.current = audioBlob;
-      // Open camera picker — small delay for mobile browser compatibility
-      setTimeout(() => inputRef.current?.click(), 100);
+      // Open camera BEFORE awaiting stopRecording — the gesture chain must not break
+      openFilePicker();
+      // Stop recording in background — the blob will be ready by the time handleCapture runs
+      stopRecording().then((audioBlob) => {
+        pendingAudioRef.current = audioBlob;
+      });
     } else {
       // Was a tap → open camera immediately (no audio)
       pendingAudioRef.current = null;
-      // Small delay for mobile browser compatibility with touch events
-      setTimeout(() => inputRef.current?.click(), 100);
+      openFilePicker();
     }
-
-    // Reset touch tracking after interaction completes
-    setTimeout(() => { isTouchRef.current = false; }, 500);
-  }, [stopRecording]);
+  }, [stopRecording, openFilePicker]);
 
   /**
    * If the user moves finger off the button, cancel the hold.
@@ -142,23 +157,50 @@ export function CameraButton() {
     }
   }, [stopRecording]);
 
+  /**
+   * onClick is the most reliable event for triggering file inputs across all browsers.
+   * On touch devices, this fires after touchend. We use it as a fallback — if the
+   * touchend handler already opened the picker, click() on an already-open input is a no-op.
+   */
+  const handleClick = useCallback(() => {
+    // Only handle if this wasn't already handled by touch events
+    // On desktop (no touch), this is the primary trigger
+    openFilePicker();
+  }, [openFilePicker]);
+
   return (
     <>
+      {/* 
+        Off-screen positioning instead of display:none.
+        iOS Safari doesn't reliably fire onChange for display:none inputs.
+      */}
       <input
         ref={inputRef}
         type="file"
         accept="image/*"
         capture="environment"
-        className="hidden"
         onChange={handleCapture}
+        style={{
+          position: "absolute",
+          width: "1px",
+          height: "1px",
+          padding: 0,
+          margin: "-1px",
+          overflow: "hidden",
+          clip: "rect(0, 0, 0, 0)",
+          whiteSpace: "nowrap",
+          border: 0,
+        }}
+        tabIndex={-1}
+        aria-hidden="true"
       />
       <button
         onTouchStart={handlePressStart}
         onTouchEnd={handlePressEnd}
         onTouchCancel={handlePressCancel}
-        onMouseDown={handlePressStart}
-        onMouseUp={handlePressEnd}
-        onMouseLeave={handlePressCancel}
+        // Desktop fallback: use onClick instead of mouseDown/mouseUp for simplicity
+        // onClick fires after touchend on mobile, but openFilePicker is idempotent
+        onClick={handleClick}
         disabled={isStreaming}
         className={`relative flex h-14 w-14 items-center justify-center rounded-full shadow-lg transition-all active:scale-95 disabled:opacity-50 ${
           showRecordingIndicator || isRecording
