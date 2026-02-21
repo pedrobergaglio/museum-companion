@@ -13,6 +13,10 @@
 # testing
 /coverage
 
+#bmad
+/_bmad/*
+.claude/*
+
 # next.js
 /.next/
 /out/
@@ -31,7 +35,12 @@ yarn-error.log*
 .pnpm-debug.log*
 
 # env files (can opt-in for committing if needed)
-.env*
+.env
+.env.local
+.env.production
+
+# data directory (photos, audio, db)
+/data/
 
 # vercel
 .vercel
