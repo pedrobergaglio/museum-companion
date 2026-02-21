@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useUserStore } from "@/stores/user-store";
 import { useChannelStore } from "@/stores/channel-store";
 import { CameraButton } from "./camera-button";
@@ -10,6 +11,7 @@ import { Headphones } from "lucide-react";
 export function InputBar() {
   const { currentUser } = useUserStore();
   const { isConnectedToGroup, photographerUserId } = useChannelStore();
+  const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
 
   // FR17: Oyentes (no fotógrafo) en canal grupal → solo lectura
   const isListener =
@@ -31,9 +33,15 @@ export function InputBar() {
 
   return (
     <div className="flex items-center justify-center gap-4 border-t border-border bg-card px-4 py-3">
-      <MicButton />
-      <CameraButton />
-      <KeyboardButton />
+      {isKeyboardOpen ? (
+        <KeyboardButton isOpen onClose={() => setIsKeyboardOpen(false)} />
+      ) : (
+        <>
+          <MicButton />
+          <CameraButton />
+          <KeyboardButton isOpen={false} onOpen={() => setIsKeyboardOpen(true)} />
+        </>
+      )}
     </div>
   );
 }

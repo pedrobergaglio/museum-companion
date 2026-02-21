@@ -33,9 +33,12 @@ export async function GET(
     }
 
     const file = await fs.readFile(filePath);
+    const contentType = sanitizedFileName.endsWith(".jpg") || sanitizedFileName.endsWith(".jpeg")
+      ? "image/jpeg"
+      : "image/webp";
     return new Response(file, {
       headers: {
-        "Content-Type": "image/webp",
+        "Content-Type": contentType,
         "Cache-Control": "public, max-age=31536000, immutable",
       },
     });

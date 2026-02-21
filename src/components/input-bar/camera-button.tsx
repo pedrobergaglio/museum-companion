@@ -38,19 +38,23 @@ export function CameraButton() {
       const audioBlob = pendingAudioRef.current;
       pendingAudioRef.current = null;
 
-      // Compress image and get geolocation in parallel
-      const [compressed, position] = await Promise.all([
-        compressImage(file),
-        getCurrentPosition(),
-      ]);
+      try {
+        // Compress image and get geolocation in parallel
+        const [compressed, position] = await Promise.all([
+          compressImage(file),
+          getCurrentPosition(),
+        ]);
 
-      await sendCapture(
-        compressed,
-        undefined,
-        position?.latitude,
-        position?.longitude,
-        audioBlob || undefined
-      );
+        await sendCapture(
+          compressed,
+          undefined,
+          position?.latitude,
+          position?.longitude,
+          audioBlob || undefined
+        );
+      } catch (error) {
+        console.error("[CameraButton] Error processing capture:", error);
+      }
 
       // Reset input
       if (inputRef.current) {
@@ -61,14 +65,22 @@ export function CameraButton() {
   );
 
   /**
+   * Track whether the interaction was touch-initiated to prevent ghost clicks.
+   */
+  const isTouchRef = useRef(false);
+
+  /**
    * Press start — start a timer. If released before threshold → tap (photo only).
    * If held past threshold → start recording audio.
    */
   const handlePressStart = useCallback(
     (e: React.TouchEvent | React.MouseEvent) => {
-      // Prevent default to avoid ghost clicks on touch
+      // Track touch vs mouse to prevent ghost clicks
       if ("touches" in e) {
-        e.preventDefault();
+        isTouchRef.current = true;
+      } else if (isTouchRef.current) {
+        // Ghost mouse event after touch — ignore
+        return;
       }
 
       isHoldingRef.current = false;
@@ -101,13 +113,17 @@ export function CameraButton() {
       setShowRecordingIndicator(false);
       const audioBlob = await stopRecording();
       pendingAudioRef.current = audioBlob;
-      // Open camera picker — the handleCapture will use the pending audio
-      inputRef.current?.click();
+      // Open camera picker — small delay for mobile browser compatibility
+      setTimeout(() => inputRef.current?.click(), 100);
     } else {
       // Was a tap → open camera immediately (no audio)
       pendingAudioRef.current = null;
-      inputRef.current?.click();
+      // Small delay for mobile browser compatibility with touch events
+      setTimeout(() => inputRef.current?.click(), 100);
     }
+
+    // Reset touch tracking after interaction completes
+    setTimeout(() => { isTouchRef.current = false; }, 500);
   }, [stopRecording]);
 
   /**

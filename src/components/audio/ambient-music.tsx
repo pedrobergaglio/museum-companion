@@ -4,7 +4,7 @@ import { useEffect, useRef, useCallback } from "react";
 import { useAudioStore } from "@/stores/audio-store";
 
 const FADE_DURATION = 2000; // 2 segundos fade in/out
-const AMBIENT_VOLUME = 0.15; // Volumen bajo de fondo
+const AMBIENT_VOLUME = 0.11; // Volumen bajo de fondo (25% mas bajo que 0.15)
 const FADE_STEPS = 40; // Pasos para el fade (suavidad)
 
 /**

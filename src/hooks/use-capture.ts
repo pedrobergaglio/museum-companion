@@ -8,6 +8,19 @@ import { useChannelStore } from "@/stores/channel-store";
 import { toast } from "sonner";
 
 /**
+ * Determine the correct filename for an audio blob based on its MIME type.
+ * This ensures Whisper receives the correct file extension.
+ */
+function getAudioFileName(blob: Blob): string {
+  const type = blob.type.toLowerCase();
+  if (type.includes("mp4") || type.includes("m4a")) return "audio.mp4";
+  if (type.includes("ogg")) return "audio.ogg";
+  if (type.includes("mp3") || type.includes("mpeg")) return "audio.mp3";
+  if (type.includes("wav")) return "audio.wav";
+  return "audio.webm";
+}
+
+/**
  * Shared SSE stream reader for capture and message responses.
  * Parses SSE events and dispatches them to the store.
  */
@@ -153,7 +166,7 @@ export function useCapture() {
       if (question) formData.append("question", question);
       if (latitude != null) formData.append("latitude", String(latitude));
       if (longitude != null) formData.append("longitude", String(longitude));
-      if (audioBlob) formData.append("audio", audioBlob, "audio.webm");
+      if (audioBlob) formData.append("audio", audioBlob, getAudioFileName(audioBlob));
       // FR20: Modo solo — no broadcast al grupo
       if (!isConnectedToGroup) formData.append("soloMode", "true");
 
@@ -323,7 +336,7 @@ export function useCapture() {
         const formData = new FormData();
         formData.append("projectId", String(activeProject.id));
         formData.append("userId", String(currentUser.id));
-        formData.append("audio", audioBlob, "audio.webm");
+        formData.append("audio", audioBlob, getAudioFileName(audioBlob));
         // FR20: Modo solo — no broadcast al grupo
         if (!isConnectedToGroup) formData.append("soloMode", "true");
 

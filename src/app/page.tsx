@@ -40,14 +40,16 @@ export default function HomePage() {
     }
   }, [isConnectedToGroup, connect, disconnect, activeProject, currentUser, fetchMessages]);
 
+  // Load settings (photographer + ambient music) — must resolve before socket connects
   useEffect(() => {
     loadFromStorage();
     loadProject();
 
     // Cargar settings (musica ambiental + fotografo) al iniciar
-    fetch("/api/settings")
-      .then((res) => res.json())
-      .then((json) => {
+    const loadSettings = async () => {
+      try {
+        const res = await fetch("/api/settings");
+        const json = await res.json();
         if (json.success) {
           setAmbientMusicEnabled(json.data.settings.ambientMusicEnabled);
           // Cargar fotografo en channel store
@@ -61,10 +63,12 @@ export default function HomePage() {
               .setPhotographer(photographerUser.id, photographerUser.name);
           }
         }
-      })
-      .catch(() => {
+      } catch {
         // No bloquear si falla — ambientMusicEnabled queda en false (default)
-      });
+      }
+    };
+
+    loadSettings();
   }, [loadFromStorage, loadProject, setAmbientMusicEnabled]);
 
   useEffect(() => {

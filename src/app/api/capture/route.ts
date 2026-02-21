@@ -48,7 +48,9 @@ export async function POST(request: Request) {
     await fs.mkdir(photoDir, { recursive: true });
 
     const timestamp = Date.now();
-    const fileName = `${timestamp}_${userId}.webp`;
+    // Determine extension from image type (webp preferred, fallback to jpeg)
+    const ext = image.type === "image/jpeg" ? "jpg" : "webp";
+    const fileName = `${timestamp}_${userId}.${ext}`;
     const filePath = path.join(photoDir, fileName);
     const imageBuffer = Buffer.from(await image.arrayBuffer());
     await fs.writeFile(filePath, imageBuffer);

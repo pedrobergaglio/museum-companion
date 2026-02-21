@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useUserStore } from "@/stores/user-store";
 import type { User } from "@/types";
 
-const USER_ICONS = ["🧑", "👩", "🧑‍🦱", "👧", "🧔"];
+const USER_ICONS = ["🧑", "👨", "👩", "👱‍♀️", "👦"];
 
 export default function SelectUserPage() {
   const router = useRouter();

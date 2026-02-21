@@ -19,7 +19,7 @@ sqlite.pragma("foreign_keys = ON");
 
 const db = drizzle(sqlite, { schema });
 
-const PRECONFIGURED_USERS = ["Pedro", "María", "Lucas", "Ana", "Carlos"];
+const PRECONFIGURED_USERS = ["Pedro", "Hernan", "Leticia", "Ana", "Juan"];
 
 const DEFAULT_SYSTEM_PROMPT =
   "Sos un guía de museo experto. Respondé en español, con datos específicos, fechas y contexto histórico. Sé conciso pero informativo. Adaptá tu explicación para que sea interesante tanto para adultos como para adolescentes.";
@@ -29,13 +29,37 @@ async function seed() {
 
   // Aplicar migraciones de Drizzle (crea tablas si no existen, aplica cambios de schema)
   const migrationsPath = path.join(process.cwd(), "drizzle", "migrations");
-  migrate(db, { migrationsFolder: migrationsPath });
-  console.log("📦 Migrations applied");
+  try {
+    migrate(db, { migrationsFolder: migrationsPath });
+    console.log("📦 Migrations applied");
+  } catch (err: unknown) {
+    // If tables already exist, that's fine — continue with seeding
+    const errStr = String(err);
+    const causeStr = (err as { cause?: unknown })?.cause ? String((err as { cause?: unknown }).cause) : "";
+    if (errStr.includes("already exists") || causeStr.includes("already exists")) {
+      console.log("📦 Tables already exist, skipping migrations");
+    } else {
+      throw err;
+    }
+  }
 
   // Check if users already exist
   const existingUsers = db.select().from(schema.users).all();
   if (existingUsers.length > 0) {
-    console.log("✅ Database already seeded, skipping.");
+    // Update existing user names to match current configuration
+    let updated = false;
+    const updateStmt = sqlite.prepare("UPDATE users SET name = ? WHERE id = ?");
+    for (let i = 0; i < Math.min(existingUsers.length, PRECONFIGURED_USERS.length); i++) {
+      if (existingUsers[i].name !== PRECONFIGURED_USERS[i]) {
+        updateStmt.run(PRECONFIGURED_USERS[i], existingUsers[i].id);
+        updated = true;
+      }
+    }
+    if (updated) {
+      console.log(`✅ Updated user names: ${PRECONFIGURED_USERS.join(", ")}`);
+    } else {
+      console.log("✅ Database already seeded, skipping.");
+    }
     return;
   }
 

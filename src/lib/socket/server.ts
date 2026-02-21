@@ -22,8 +22,8 @@ export function initSocketIO(httpServer: HttpServer): SocketIOServer {
     },
     // Reconexion y transporte
     transports: ["websocket", "polling"],
-    pingInterval: 10000,
-    pingTimeout: 5000,
+    pingInterval: 25000,
+    pingTimeout: 20000,
   });
 
   io.on("connection", (socket) => {

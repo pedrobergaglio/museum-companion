@@ -14,8 +14,8 @@ import type {
 import { toast } from "sonner";
 
 const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || "";
-const MAX_RECONNECT_ATTEMPTS = 3;
-const RECONNECT_INTERVAL = 5000; // NFR11: cada 5 segundos
+const MAX_RECONNECT_ATTEMPTS = 10;
+const RECONNECT_INTERVAL = 3000; // NFR11: cada 3 segundos
 
 /** Hook que gestiona la conexión Socket.IO del cliente. */
 export function useSocket(userId: number | null, projectId: number | null) {
@@ -145,9 +145,15 @@ export function useSocket(userId: number | null, projectId: number | null) {
 
     // --- Disconnect + reconexion manual (NFR11/12) ---
 
-    socket.on("disconnect", () => {
-      console.log("[Socket.IO] Client disconnected");
+    socket.on("disconnect", (reason) => {
+      console.log("[Socket.IO] Client disconnected, reason:", reason);
       setConnectedToGroup(false);
+      // Only attempt reconnect for non-intentional disconnects
+      if (reason === "io server disconnect" || reason === "io client disconnect") {
+        // Intentional disconnect — don't reconnect
+        return;
+      }
+      // Transport close, ping timeout, etc. — try to reconnect
       attemptReconnect();
     });
 
